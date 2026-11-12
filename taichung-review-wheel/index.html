@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>台中網評美食轉盤</title>
+  <meta name="theme-color" content="#0b7285">
+  <meta name="description" content="台中 30 家網路評價最高的餐廳轉盤。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="台中網評">
   <style>
     :root {
       --bg: #f7f4ee;
@@ -65,6 +74,7 @@
     .filters { display: grid; gap: 10px; }
     .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .filter-row .filter-label { font-weight: 600; min-width: 3em; }
+    .chip.install { margin-top: 10px; }
     .chip {
       font: inherit;
       padding: 7px 14px;
@@ -173,6 +183,7 @@
     <header>
       <h1>台中網評美食轉盤</h1>
       <p>30 家網路評價最好的台中餐廳，Google 高分與網友推薦名店，轉一下決定吃哪家。</p>
+      <button class="chip install" id="install-button" type="button" hidden>安裝到主畫面</button>
     </header>
 
     <section class="filters" aria-label="篩選">
@@ -432,6 +443,32 @@
       }
 
       drawWheel();
+    })();
+  </script>
+  <script>
+    // PWA：註冊離線快取，並在瀏覽器允許時顯示「安裝到主畫面」按鈕
+    (function () {
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+          navigator.serviceWorker.register("sw.js").catch(function () {});
+        });
+      }
+      var installButton = document.getElementById("install-button");
+      var deferred = null;
+      window.addEventListener("beforeinstallprompt", function (event) {
+        event.preventDefault();
+        deferred = event;
+        installButton.hidden = false;
+      });
+      installButton.addEventListener("click", function () {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred.userChoice.finally(function () {
+          deferred = null;
+          installButton.hidden = true;
+        });
+      });
+      window.addEventListener("appinstalled", function () { installButton.hidden = true; });
     })();
   </script>
 </body>
