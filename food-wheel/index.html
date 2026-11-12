@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>台灣小吃轉盤</title>
+  <style>
+    :root {
+      --bg: #fff8ef;
+      --card: #ffffff;
+      --text: #2b2118;
+      --muted: #7a6a5a;
+      --border: #ead9c4;
+      --accent: #d9480f;
+      --accent-dark: #a8380b;
+      --chip-on-text: #ffffff;
+      --wheel-line: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #1d1712;
+        --card: #2a221b;
+        --text: #f5ece2;
+        --muted: #bba995;
+        --border: #4a3d31;
+        --accent: #ff7a3d;
+        --accent-dark: #ff9a66;
+        --chip-on-text: #1d1712;
+        --wheel-line: #2a221b;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #1d1712;
+      --card: #2a221b;
+      --text: #f5ece2;
+      --muted: #bba995;
+      --border: #4a3d31;
+      --accent: #ff7a3d;
+      --accent-dark: #ff9a66;
+      --chip-on-text: #1d1712;
+      --wheel-line: #2a221b;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      line-height: 1.6;
+    }
+    main {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+      display: grid;
+      gap: 20px;
+    }
+    header h1 { margin: 0; font-size: 1.7rem; }
+    header p { margin: 4px 0 0; color: var(--muted); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      font: inherit;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--chip-on-text); font-weight: 600; }
+    .chip:focus-visible, .spin:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 2px; }
+
+    .wheel-wrap {
+      position: relative;
+      width: min(100%, 420px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+    }
+    .wheel-wrap canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+      will-change: transform;
+    }
+    /* 上方指針 */
+    .pointer {
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 30px solid var(--text);
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+      z-index: 1;
+    }
+    .hub {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 22%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--card);
+      border: 4px solid var(--accent);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: clamp(0.8rem, 3.5vw, 1rem);
+      color: var(--accent);
+    }
+
+    .spin {
+      font: inherit;
+      font-size: 1.15rem;
+      font-weight: 700;
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--accent);
+      color: var(--chip-on-text);
+      cursor: pointer;
+    }
+    .spin:disabled { opacity: 0.6; cursor: wait; }
+
+    .result {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 112px;
+    }
+    .result .label { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .result h2 { margin: 2px 0 4px; font-size: 1.6rem; color: var(--accent); }
+    .result .place { margin: 0 0 6px; font-weight: 600; }
+    .result .desc { margin: 0; }
+
+    .history h3 { margin: 0 0 6px; font-size: 1rem; }
+    .history ol { margin: 0; padding-left: 1.4em; color: var(--muted); }
+    .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>台灣小吃轉盤</h1>
+      <p>不知道吃什麼？轉一下，讓轉盤幫你決定。</p>
+    </header>
+
+    <section aria-label="選擇地區">
+      <div class="chips" id="region-chips"></div>
+    </section>
+
+    <div class="wheel-wrap">
+      <div class="pointer" aria-hidden="true"></div>
+      <canvas id="wheel" width="840" height="840" role="img" aria-label="小吃轉盤"></canvas>
+      <div class="hub" aria-hidden="true">開吃</div>
+    </div>
+
+    <button class="spin" id="spin-button" type="button">轉一下！</button>
+
+    <section class="result" id="result" aria-live="polite">
+      <p class="label">今天吃什麼？</p>
+      <h2>按下「轉一下」</h2>
+    </section>
+
+    <section class="history" id="history" hidden>
+      <h3>最近轉到</h3>
+      <ol id="history-list"></ol>
+    </section>
+
+    <p class="note">名單是各地常見的代表小吃，「最好吃」見仁見智，歡迎自己加。</p>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // 小吃名單：名稱、代表地區、所屬區域、簡短介紹。
+      var FOODS = [
+        { name: "滷肉飯", place: "台北", region: "北部", desc: "肥瘦相間的滷肉丁淋上白飯，鹹香下飯。" },
+        { name: "胡椒餅", place: "台北", region: "北部", desc: "貼在炭爐壁上烤，酥皮裡是胡椒肉餡和大把青蔥。" },
+        { name: "營養三明治", place: "基隆", region: "北部", desc: "炸得酥脆的麵包夾滷蛋、火腿、小黃瓜和美乃滋。" },
+        { name: "鼎邊趖", place: "基隆", region: "北部", desc: "米漿沿著鍋邊燙成米片，配上料多的羹湯。" },
+        { name: "臭豆腐", place: "新北深坑", region: "北部", desc: "外酥內嫩，配泡菜或做成麻辣口味都好吃。" },
+        { name: "芋圓", place: "新北九份", region: "北部", desc: "Q 彈的芋圓、地瓜圓，冷熱甜湯都適合。" },
+        { name: "貢丸湯", place: "新竹", region: "北部", desc: "豬肉打成的貢丸咬下去有彈性，湯頭清爽。" },
+        { name: "太陽餅", place: "台中", region: "中部", desc: "層層酥皮包著麥芽糖餡，配茶剛剛好。" },
+        { name: "珍珠奶茶", place: "台中", region: "中部", desc: "奶茶加上 Q 彈粉圓，台灣代表飲品。" },
+        { name: "肉圓", place: "彰化", region: "中部", desc: "透明 Q 皮包著豬肉與筍丁，淋上甜辣醬。" },
+        { name: "雞肉飯", place: "嘉義", region: "南部", desc: "火雞肉絲鋪在白飯上，淋雞油與醬汁，再加紅蔥酥。" },
+        { name: "牛肉湯", place: "台南", region: "南部", desc: "生牛肉片用熱湯一沖就熟，鮮甜的台南早餐。" },
+        { name: "碗粿", place: "台南", region: "南部", desc: "米漿蒸成的碗粿配肉燥、蛋黃，淋上醬汁。" },
+        { name: "擔仔麵", place: "台南", region: "南部", desc: "小碗油麵加肉燥、蝦仁，份量小剛好解饞。" },
+        { name: "木瓜牛奶", place: "高雄", region: "南部", desc: "新鮮木瓜和牛奶打成，香濃順口。" },
+        { name: "萬巒豬腳", place: "屏東", region: "南部", desc: "滷得軟 Q 的豬腳切片，沾蒜蓉醬吃。" },
+        { name: "蔥油餅", place: "宜蘭三星", region: "東部離島", desc: "用三星蔥做的蔥油餅，可以加蛋，蔥香很足。" },
+        { name: "扁食", place: "花蓮", region: "東部離島", desc: "皮薄餡多的餛飩，湯清味鮮。" },
+        { name: "池上便當", place: "台東", region: "東部離島", desc: "池上米飯配排骨與小菜，一盒吃飽。" },
+        { name: "仙人掌冰", place: "澎湖", region: "東部離島", desc: "仙人掌果做成的紫紅色冰品，酸甜消暑。" }
+      ];
+      var REGIONS = ["北部", "中部", "南部", "東部離島"];
+      var COLORS = ["#f76707", "#fab005", "#40c057", "#15aabf", "#4c6ef5", "#be4bdb", "#f03e3e", "#12b886"];
+      var TAU = Math.PI * 2;
+
+      var canvas = document.getElementById("wheel");
+      var ctx = canvas.getContext("2d");
+      var spinButton = document.getElementById("spin-button");
+      var result = document.getElementById("result");
+      var chipsBox = document.getElementById("region-chips");
+      var historyBox = document.getElementById("history");
+      var historyList = document.getElementById("history-list");
+
+      var selected = REGIONS.slice();
+      var items = FOODS.slice();
+      var rotation = 0;    // 目前轉盤角度（弧度，順時針為正）
+      var spinning = false;
+      var history = [];
+      var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function lineColor() {
+        return getComputedStyle(document.documentElement).getPropertyValue("--wheel-line").trim() || "#fff";
+      }
+
+      // 畫轉盤：第 0 格從正上方開始，順時針排列。
+      function drawWheel() {
+        var size = canvas.width, c = size / 2, r = c - 6;
+        var arc = TAU / items.length;
+        var fontSize = items.length > 14 ? 30 : items.length > 8 ? 36 : 44;
+        ctx.clearRect(0, 0, size, size);
+        items.forEach(function (item, i) {
+          var start = -Math.PI / 2 + i * arc;
+          ctx.beginPath();
+          ctx.moveTo(c, c);
+          ctx.arc(c, c, r, start, start + arc);
+          ctx.closePath();
+          var color = COLORS[i % COLORS.length];
+          // 格數為奇數時，最後一格避免與第一格同色
+          if (i === items.length - 1 && i % COLORS.length === 0 && i > 0) color = COLORS[3];
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = lineColor();
+          ctx.stroke();
+
+          ctx.save();
+          ctx.translate(c, c);
+          ctx.rotate(start + arc / 2);
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#ffffff";
+          ctx.shadowColor = "rgba(0,0,0,0.45)";
+          ctx.shadowBlur = 4;
+          ctx.font = "700 " + fontSize + "px system-ui, 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+          ctx.fillText(item.name, r - 44, 0);   // 離外圈留空間，避免被上方指針蓋住
+          ctx.restore();
+        });
+      }
+
+      function setRotation(rad) {
+        rotation = rad;
+        canvas.style.transform = "rotate(" + rad + "rad)";
+      }
+
+      // 指針在正上方：轉盤順時針轉了 rotation，指針對到的是第 floor((-rotation mod 2π) / 每格角度) 格。
+      function indexAtPointer() {
+        var arc = TAU / items.length;
+        var a = ((-rotation % TAU) + TAU) % TAU;
+        return Math.floor(a / arc) % items.length;
+      }
+
+      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+      function spin() {
+        if (spinning || items.length < 2) return;
+        spinning = true;
+        spinButton.disabled = true;
+        result.innerHTML = '<p class="label">轉盤轉動中…</p><h2>猜猜看是哪一個？</h2>';
+
+        var arc = TAU / items.length;
+        var target = Math.floor(Math.random() * items.length);
+        var jitter = (Math.random() - 0.5) * arc * 0.7;   // 停在該格內的隨機位置，不壓線
+        var desired = -(target + 0.5) * arc + jitter;
+        var delta = ((desired - rotation) % TAU + TAU) % TAU;
+        var turns = reduceMotion ? 0 : 5 + Math.floor(Math.random() * 3);
+        var from = rotation;
+        var to = rotation + turns * TAU + delta;
+        var duration = reduceMotion ? 400 : 4500;
+        var t0 = null;
+
+        function frame(now) {
+          if (t0 === null) t0 = now;
+          var t = Math.min(1, (now - t0) / duration);
+          setRotation(from + (to - from) * easeOutCubic(t));
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            setRotation(to % TAU);
+            spinning = false;
+            spinButton.disabled = false;
+            showResult(items[indexAtPointer()]);
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function showResult(item) {
+        result.textContent = "";
+        var label = document.createElement("p");
+        label.className = "label";
+        label.textContent = "今天就吃";
+        var h2 = document.createElement("h2");
+        h2.textContent = item.name;
+        var place = document.createElement("p");
+        place.className = "place";
+        place.textContent = "代表地區：" + item.place;
+        var desc = document.createElement("p");
+        desc.className = "desc";
+        desc.textContent = item.desc;
+        result.append(label, h2, place, desc);
+
+        history.unshift(item.name + "（" + item.place + "）");
+        history = history.slice(0, 5);
+        historyList.textContent = "";
+        history.forEach(function (text) {
+          var li = document.createElement("li");
+          li.textContent = text;
+          historyList.appendChild(li);
+        });
+        historyBox.hidden = false;
+      }
+
+      function applyFilter() {
+        items = FOODS.filter(function (f) { return selected.indexOf(f.region) !== -1; });
+        setRotation(0);
+        drawWheel();
+        spinButton.disabled = items.length < 2;
+        if (items.length < 2) {
+          result.innerHTML = '<p class="label">選項太少</p><h2>請至少選一個地區</h2>';
+        }
+      }
+
+      REGIONS.forEach(function (region) {
+        var count = FOODS.filter(function (f) { return f.region === region; }).length;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip";
+        btn.textContent = region + "（" + count + "）";
+        btn.setAttribute("aria-pressed", "true");
+        btn.addEventListener("click", function () {
+          if (spinning) return;
+          var on = btn.getAttribute("aria-pressed") === "true";
+          btn.setAttribute("aria-pressed", on ? "false" : "true");
+          selected = REGIONS.filter(function (r, i) {
+            return chipsBox.children[i].getAttribute("aria-pressed") === "true";
+          });
+          applyFilter();
+        });
+        chipsBox.appendChild(btn);
+      });
+
+      spinButton.addEventListener("click", spin);
+      if (window.matchMedia) {
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        if (mq.addEventListener) mq.addEventListener("change", drawWheel);
+      }
+
+      drawWheel();
+    })();
+  </script>
+</body>
+</html>
