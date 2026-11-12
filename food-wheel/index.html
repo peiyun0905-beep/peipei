@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>台灣小吃轉盤</title>
+  <title>全台美食轉盤</title>
   <style>
     :root {
       --bg: #fff8ef;
@@ -139,7 +139,18 @@
     .result .label { margin: 0; color: var(--muted); font-size: 0.9rem; }
     .result h2 { margin: 2px 0 4px; font-size: 1.6rem; color: var(--accent); }
     .result .place { margin: 0 0 6px; font-weight: 600; }
-    .result .desc { margin: 0; }
+    .result .where { margin: 0 0 6px; color: var(--muted); }
+    .result .desc { margin: 0 0 10px; }
+    .result .map-link {
+      display: inline-block;
+      padding: 8px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .result .map-link:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 2px; }
 
     .history h3 { margin: 0 0 6px; font-size: 1rem; }
     .history ol { margin: 0; padding-left: 1.4em; color: var(--muted); }
@@ -149,8 +160,8 @@
 <body>
   <main>
     <header>
-      <h1>台灣小吃轉盤</h1>
-      <p>不知道吃什麼？轉一下，讓轉盤幫你決定。</p>
+      <h1>全台美食轉盤</h1>
+      <p>不知道去哪家吃？轉一下，讓轉盤幫你挑一家名店。</p>
     </header>
 
     <section aria-label="選擇地區">
@@ -159,7 +170,7 @@
 
     <div class="wheel-wrap">
       <div class="pointer" aria-hidden="true"></div>
-      <canvas id="wheel" width="840" height="840" role="img" aria-label="小吃轉盤"></canvas>
+      <canvas id="wheel" width="840" height="840" role="img" aria-label="美食轉盤"></canvas>
       <div class="hub" aria-hidden="true">開吃</div>
     </div>
 
@@ -175,35 +186,36 @@
       <ol id="history-list"></ol>
     </section>
 
-    <p class="note">名單是各地常見的代表小吃，「最好吃」見仁見智，歡迎自己加。</p>
+    <p class="note">名單整理自公開美食報導（2026 年 11 月），挑的是各地常被推薦的老店，「最好吃」見仁見智。店家可能休息、搬遷或調整營業時間，出發前請先用地圖或店家社群確認。</p>
   </main>
 
   <script>
     (function () {
       "use strict";
 
-      // 小吃名單：名稱、代表地區、所屬區域、簡短介紹。
+      // 美食名單：商家名稱、招牌小吃、所在地、所屬區域、簡短介紹。
+      // 商家資料整理自 2026 年 11 月的公開美食報導；營業時間常有變動，出發前請先確認。
       var FOODS = [
-        { name: "滷肉飯", place: "台北", region: "北部", desc: "肥瘦相間的滷肉丁淋上白飯，鹹香下飯。" },
-        { name: "胡椒餅", place: "台北", region: "北部", desc: "貼在炭爐壁上烤，酥皮裡是胡椒肉餡和大把青蔥。" },
-        { name: "營養三明治", place: "基隆", region: "北部", desc: "炸得酥脆的麵包夾滷蛋、火腿、小黃瓜和美乃滋。" },
-        { name: "鼎邊趖", place: "基隆", region: "北部", desc: "米漿沿著鍋邊燙成米片，配上料多的羹湯。" },
-        { name: "臭豆腐", place: "新北深坑", region: "北部", desc: "外酥內嫩，配泡菜或做成麻辣口味都好吃。" },
-        { name: "芋圓", place: "新北九份", region: "北部", desc: "Q 彈的芋圓、地瓜圓，冷熱甜湯都適合。" },
-        { name: "貢丸湯", place: "新竹", region: "北部", desc: "豬肉打成的貢丸咬下去有彈性，湯頭清爽。" },
-        { name: "太陽餅", place: "台中", region: "中部", desc: "層層酥皮包著麥芽糖餡，配茶剛剛好。" },
-        { name: "珍珠奶茶", place: "台中", region: "中部", desc: "奶茶加上 Q 彈粉圓，台灣代表飲品。" },
-        { name: "肉圓", place: "彰化", region: "中部", desc: "透明 Q 皮包著豬肉與筍丁，淋上甜辣醬。" },
-        { name: "雞肉飯", place: "嘉義", region: "南部", desc: "火雞肉絲鋪在白飯上，淋雞油與醬汁，再加紅蔥酥。" },
-        { name: "牛肉湯", place: "台南", region: "南部", desc: "生牛肉片用熱湯一沖就熟，鮮甜的台南早餐。" },
-        { name: "碗粿", place: "台南", region: "南部", desc: "米漿蒸成的碗粿配肉燥、蛋黃，淋上醬汁。" },
-        { name: "擔仔麵", place: "台南", region: "南部", desc: "小碗油麵加肉燥、蝦仁，份量小剛好解饞。" },
-        { name: "木瓜牛奶", place: "高雄", region: "南部", desc: "新鮮木瓜和牛奶打成，香濃順口。" },
-        { name: "萬巒豬腳", place: "屏東", region: "南部", desc: "滷得軟 Q 的豬腳切片，沾蒜蓉醬吃。" },
-        { name: "蔥油餅", place: "宜蘭三星", region: "東部離島", desc: "用三星蔥做的蔥油餅，可以加蛋，蔥香很足。" },
-        { name: "扁食", place: "花蓮", region: "東部離島", desc: "皮薄餡多的餛飩，湯清味鮮。" },
-        { name: "池上便當", place: "台東", region: "東部離島", desc: "池上米飯配排骨與小菜，一盒吃飽。" },
-        { name: "仙人掌冰", place: "澎湖", region: "東部離島", desc: "仙人掌果做成的紫紅色冰品，酸甜消暑。" }
+        { shop: "金峰魯肉飯", dish: "滷肉飯", place: "台北市中正區（中正紀念堂附近）", region: "北部", desc: "肥瘦相間的滷肉淋上白飯，鹹香下飯，營業到深夜。" },
+        { shop: "福州世祖胡椒餅", dish: "胡椒餅", place: "台北市松山區饒河街夜市", region: "北部", desc: "貼在炭爐壁上烤，酥皮裡是胡椒肉餡和大把青蔥，曾獲必比登推介。" },
+        { shop: "天盛舖營養三明治", dish: "營養三明治", place: "基隆廟口夜市 58 號攤", region: "北部", desc: "炸得酥脆的麵包夾滷蛋、火腿、小黃瓜和美乃滋。" },
+        { shop: "吳家鼎邊趖", dish: "鼎邊趖", place: "基隆廟口夜市", region: "北部", desc: "米漿沿著鍋邊燙成米片，配上料多的羹湯。" },
+        { shop: "王水成老店水成館", dish: "臭豆腐", place: "新北市深坑老街", region: "北部", desc: "豆腐軟嫩、口味偏重，蒜香臭豆腐是特色。" },
+        { shop: "阿柑姨芋圓", dish: "芋圓", place: "新北市瑞芳區九份", region: "北部", desc: "現做芋圓冷熱都有，窗邊座位可以看海。" },
+        { shop: "海瑞摃丸", dish: "摃丸", place: "新竹市北區西門街", region: "北部", desc: "1960 年代起把摃丸做成新竹名產，Q 彈有嚼勁。" },
+        { shop: "阿明師老太陽堂", dish: "太陽餅", place: "台中市中區自由路", region: "中部", desc: "太陽餅發明人魏清海一脈相傳的老店，麥芽餡濃郁。" },
+        { shop: "春水堂四維創始店", dish: "珍珠奶茶", place: "台中市西區四維街", region: "中部", desc: "常被稱為珍珠奶茶發源地的創始店。" },
+        { shop: "老担阿璋肉圓", dish: "肉圓", place: "彰化市", region: "中部", desc: "1948 年創立，Q 皮包著筍丁、後腿肉和香菇。" },
+        { shop: "噴水雞肉飯", dish: "火雞肉飯", place: "嘉義市西區中山路（噴水圓環旁）", region: "南部", desc: "嘉義雞肉飯代表老店，火雞肉絲淋雞油與醬汁。" },
+        { shop: "阿村牛肉湯", dish: "牛肉湯", place: "台南市中西區保安路", region: "南部", desc: "1968 年創立，清晨就開賣，牛肉片用熱湯一沖就熟；賣完提早收。" },
+        { shop: "富盛號碗粿", dish: "碗粿", place: "台南市中西區", region: "南部", desc: "第三代經營的碗粿老店，配肉燥與蛋黃。" },
+        { shop: "度小月擔仔麵", dish: "擔仔麵", place: "台南市中西區中正路（原始店）", region: "南部", desc: "1895 年創立，百年肉燥配小碗油麵與蝦仁。" },
+        { shop: "鄭老牌木瓜牛奶", dish: "木瓜牛奶", place: "高雄市新興區六合夜市入口", region: "南部", desc: "1965 年創立，選用屏東木瓜現打，香濃順口。" },
+        { shop: "海鴻飯店", dish: "萬巒豬腳", place: "屏東縣萬巒鄉豬腳街", region: "南部", desc: "萬巒豬腳代表老店，豬腳軟 Q，配特調醬料。" },
+        { shop: "正好鮮肉小籠包", dish: "小籠包", place: "宜蘭市泰山路", region: "東部離島", desc: "宜蘭排隊名店，現包現蒸，只能外帶。" },
+        { shop: "液香扁食", dish: "扁食", place: "花蓮市信義街", region: "東部離島", desc: "菜單只有扁食湯，皮薄餡多；只賣上午，週日公休。" },
+        { shop: "全美行池上便當", dish: "池上便當", place: "台東縣池上鄉（池上車站附近）", region: "東部離島", desc: "早年在月台賣鐵路便當的老店，池上米飯配菜。" },
+        { shop: "易家仙人掌冰", dish: "仙人掌冰", place: "澎湖縣白沙鄉（跨海大橋旁）", region: "東部離島", desc: "相傳是澎湖最早賣仙人掌冰的店，紫紅色店面很醒目。" }
       ];
       var REGIONS = ["北部", "中部", "南部", "東部離島"];
       var COLORS = ["#f76707", "#fab005", "#40c057", "#15aabf", "#4c6ef5", "#be4bdb", "#f03e3e", "#12b886"];
@@ -257,8 +269,14 @@
           ctx.fillStyle = "#ffffff";
           ctx.shadowColor = "rgba(0,0,0,0.45)";
           ctx.shadowBlur = 4;
-          ctx.font = "700 " + fontSize + "px system-ui, 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
-          ctx.fillText(item.name, r - 44, 0);   // 離外圈留空間，避免被上方指針蓋住
+          // 店名太長時自動縮小字級，避免文字壓到中間的圓心
+          var maxWidth = r - 44 - size * 0.11 - 16;
+          var fs = fontSize;
+          do {
+            ctx.font = "700 " + fs + "px system-ui, 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+            fs -= 2;
+          } while (ctx.measureText(item.shop).width > maxWidth && fs > 16);
+          ctx.fillText(item.shop, r - 44, 0);   // 離外圈留空間，避免被上方指針蓋住
           ctx.restore();
         });
       }
@@ -314,18 +332,27 @@
         result.textContent = "";
         var label = document.createElement("p");
         label.className = "label";
-        label.textContent = "今天就吃";
+        label.textContent = "今天就去吃";
         var h2 = document.createElement("h2");
-        h2.textContent = item.name;
+        h2.textContent = item.shop;
+        var dish = document.createElement("p");
+        dish.className = "place";
+        dish.textContent = "招牌：" + item.dish;
         var place = document.createElement("p");
-        place.className = "place";
-        place.textContent = "代表地區：" + item.place;
+        place.className = "where";
+        place.textContent = "地點：" + item.place;
         var desc = document.createElement("p");
         desc.className = "desc";
         desc.textContent = item.desc;
-        result.append(label, h2, place, desc);
+        var map = document.createElement("a");
+        map.className = "map-link";
+        map.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(item.shop + " " + item.place);
+        map.target = "_blank";
+        map.rel = "noopener noreferrer";
+        map.textContent = "在 Google 地圖查看";
+        result.append(label, h2, dish, place, desc, map);
 
-        history.unshift(item.name + "（" + item.place + "）");
+        history.unshift(item.shop + "（" + item.dish + "）");
         history = history.slice(0, 5);
         historyList.textContent = "";
         history.forEach(function (text) {
