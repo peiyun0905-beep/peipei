@@ -3,3 +3,4 @@
 雲端任務測試
 欄位與範例資料：[報修欄位表](文件/報修欄位表.xlsx)
 全台美食轉盤（含商家名稱）：[food-wheel/](food-wheel/)
+全台 30 家米其林星級餐廳轉盤：[restaurant-wheel/](restaurant-wheel/)
