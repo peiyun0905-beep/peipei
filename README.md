@@ -5,3 +5,4 @@
 全台美食轉盤（含商家名稱）：[food-wheel/](food-wheel/)
 全台 30 家米其林星級餐廳轉盤：[restaurant-wheel/](restaurant-wheel/)
 台中 30 家米其林肯定餐廳轉盤：[taichung-wheel/](taichung-wheel/)
+台中 30 家網路評價美食轉盤：[taichung-review-wheel/](taichung-review-wheel/)
