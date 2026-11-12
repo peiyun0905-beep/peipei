@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>全台餐廳轉盤</title>
+  <style>
+    :root {
+      --bg: #f7f4ee;
+      --card: #ffffff;
+      --text: #22201c;
+      --muted: #6f685d;
+      --border: #e3dccf;
+      --accent: #b3261e;
+      --accent-dark: #8c1d17;
+      --gold: #b8860b;
+      --chip-on-text: #ffffff;
+      --wheel-line: #ffffff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #17150f;
+        --card: #24211a;
+        --text: #f3eee4;
+        --muted: #b7ad9c;
+        --border: #443e32;
+        --accent: #ff6b5e;
+        --accent-dark: #ff8f85;
+        --gold: #e0b44a;
+        --chip-on-text: #17150f;
+        --wheel-line: #24211a;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #17150f;
+      --card: #24211a;
+      --text: #f3eee4;
+      --muted: #b7ad9c;
+      --border: #443e32;
+      --accent: #ff6b5e;
+      --accent-dark: #ff8f85;
+      --gold: #e0b44a;
+      --chip-on-text: #17150f;
+      --wheel-line: #24211a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      line-height: 1.6;
+    }
+    main {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+      display: grid;
+      gap: 18px;
+    }
+    header h1 { margin: 0; font-size: 1.7rem; }
+    header p { margin: 4px 0 0; color: var(--muted); }
+
+    .filters { display: grid; gap: 10px; }
+    .filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .filter-row .filter-label { font-weight: 600; min-width: 3em; }
+    .chip {
+      font: inherit;
+      padding: 7px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--chip-on-text); font-weight: 600; }
+    .chip:focus-visible, .spin:focus-visible, .map-link:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 2px; }
+
+    .wheel-wrap {
+      position: relative;
+      width: min(100%, 440px);
+      aspect-ratio: 1;
+      margin: 0 auto;
+    }
+    /* 圓形裁切：轉盤旋轉時，方形畫布的角不會超出版面造成左右捲動 */
+    .wheel-clip {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+    }
+    .wheel-clip canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      will-change: transform;
+    }
+    /* 上方指針 */
+    .pointer {
+      position: absolute;
+      top: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 30px solid var(--text);
+      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+      z-index: 1;
+    }
+    .hub {
+      position: absolute;
+      inset: 50% auto auto 50%;
+      width: 20%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: var(--card);
+      border: 4px solid var(--gold);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: clamp(0.75rem, 3.2vw, 0.95rem);
+      color: var(--gold);
+    }
+
+    .spin {
+      font: inherit;
+      font-size: 1.15rem;
+      font-weight: 700;
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      border-radius: 12px;
+      background: var(--accent);
+      color: var(--chip-on-text);
+      cursor: pointer;
+    }
+    .spin:disabled { opacity: 0.6; cursor: wait; }
+
+    .result {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 120px;
+    }
+    .result .label { margin: 0; color: var(--muted); font-size: 0.9rem; }
+    .result h2 { margin: 2px 0 4px; font-size: 1.6rem; color: var(--accent); overflow-wrap: anywhere; }
+    .result .stars { margin: 0 0 4px; font-weight: 700; color: var(--gold); letter-spacing: 1px; }
+    .result .where { margin: 0 0 6px; color: var(--muted); }
+    .result .desc { margin: 0 0 10px; }
+    .result .map-link {
+      display: inline-block;
+      padding: 8px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .history h3 { margin: 0 0 6px; font-size: 1rem; }
+    .history ol { margin: 0; padding-left: 1.4em; color: var(--muted); }
+    .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>全台餐廳轉盤</h1>
+      <p>30 家 2026 米其林星級餐廳，轉一下決定下一頓大餐。</p>
+    </header>
+
+    <section class="filters" aria-label="篩選">
+      <div class="filter-row" id="region-chips"><span class="filter-label">地區</span></div>
+      <div class="filter-row" id="star-chips"><span class="filter-label">星級</span></div>
+    </section>
+
+    <div class="wheel-wrap">
+      <div class="pointer" aria-hidden="true"></div>
+      <div class="wheel-clip"><canvas id="wheel" width="880" height="880" role="img" aria-label="餐廳轉盤"></canvas></div>
+      <div class="hub" aria-hidden="true">開吃</div>
+    </div>
+
+    <button class="spin" id="spin-button" type="button">轉一下！</button>
+
+    <section class="result" id="result" aria-live="polite">
+      <p class="label">下一頓吃哪家？</p>
+      <h2>按下「轉一下」</h2>
+    </section>
+
+    <section class="history" id="history" hidden>
+      <h3>最近轉到</h3>
+      <ol id="history-list"></ol>
+    </section>
+
+    <p class="note">名單取自 2026 年 7 月 21 日公布的《臺灣米其林指南 2026》星級餐廳（共 61 家），收錄全部三星與二星，一星依城市挑選。星級每年更新，餐廳多為預約制套餐，出發前請到米其林官網與餐廳官網確認訂位與營業資訊。</p>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // 餐廳名單：名稱、所在城市、星級、地區、介紹（只寫查證過的資訊）。
+      // 資料整理自 2026 年 11 月的公開報導（中央社、聯合報、食尚玩家等）。
+      var RESTAURANTS = [
+        { name: "頤宮", city: "台北市", stars: 3, region: "北部", desc: "精緻粵菜，連年蟬聯三星。" },
+        { name: "態芮", city: "台北市", stars: 3, region: "北部", desc: "以現代料理手法重新詮釋台灣風土。" },
+        { name: "JL Studio", city: "台中市", stars: 3, region: "中部", desc: "以新加坡料理為基礎的創新料理，台中唯一三星。" },
+        { name: "Mizue", city: "台北市", stars: 2, region: "北部", desc: "日本料理，位於台北嘉佩樂酒店，首度入選就摘下二星。" },
+        { name: "NOBUO", city: "台北市", stars: 2, region: "北部", desc: "以握壽司為招牌，2026 年由一星晉升二星。" },
+        { name: "侯布雄", city: "台北市", stars: 2, region: "北部", desc: "L'ATELIER de Joël Robuchon 法式餐廳。" },
+        { name: "A", city: "台北市", stars: 2, region: "北部", desc: "" },
+        { name: "logy", city: "台北市", stars: 2, region: "北部", desc: "" },
+        { name: "渥達尼斯磨坊", city: "台北市", stars: 2, region: "北部", desc: "" },
+        { name: "牡丹", city: "台北市", stars: 2, region: "北部", desc: "" },
+        { name: "彧割烹", city: "台北市", stars: 2, region: "北部", desc: "" },
+        { name: "盈科", city: "台北市", stars: 2, region: "北部", desc: "" },
+        { name: "晶華軒", city: "台北市", stars: 1, region: "北部", desc: "2026 年升為一星。" },
+        { name: "Mume", city: "台北市", stars: 1, region: "北部", desc: "2026 年升為一星。" },
+        { name: "掬", city: "台北市", stars: 1, region: "北部", desc: "2026 年升為一星。" },
+        { name: "Restaurant 12", city: "台北市", stars: 1, region: "北部", desc: "2026 年首次入選就獲得一星。" },
+        { name: "壽司芳", city: "台北市", stars: 1, region: "北部", desc: "" },
+        { name: "川雅", city: "台北市", stars: 1, region: "北部", desc: "" },
+        { name: "金蓬萊遵古台菜", city: "台北市", stars: 1, region: "北部", desc: "" },
+        { name: "鮨安", city: "新竹縣", stars: 1, region: "北部", desc: "新竹縣第一家星級餐廳，主廚同獲年輕主廚大獎。" },
+        { name: "山与", city: "台中市", stars: 1, region: "中部", desc: "2026 年新摘一星。" },
+        { name: "俺達の肉屋", city: "台中市", stars: 1, region: "中部", desc: "" },
+        { name: "元紀", city: "台中市", stars: 1, region: "中部", desc: "" },
+        { name: "予島", city: "台南市", stars: 1, region: "南部", desc: "位於漁光島，台南第一家星級餐廳，同獲綠星與年度開業大獎。" },
+        { name: "Nibbon", city: "高雄市", stars: 1, region: "南部", desc: "2026 年由入選升為一星。" },
+        { name: "Hābu", city: "高雄市", stars: 1, region: "南部", desc: "2026 年首次入選就獲得一星。" },
+        { name: "承 Sho", city: "高雄市", stars: 1, region: "南部", desc: "" },
+        { name: "方蒔", city: "高雄市", stars: 1, region: "南部", desc: "" },
+        { name: "雋 GEN", city: "高雄市", stars: 1, region: "南部", desc: "" },
+        { name: "HAILI", city: "高雄市", stars: 1, region: "南部", desc: "" }
+      ];
+      var REGIONS = ["北部", "中部", "南部"];
+      var STARS = [3, 2, 1];
+      var COLORS = ["#c92a2a", "#e8590c", "#f08c00", "#2b8a3e", "#0b7285", "#1864ab", "#5f3dc4", "#a61e4d"];
+      var TAU = Math.PI * 2;
+
+      var canvas = document.getElementById("wheel");
+      var ctx = canvas.getContext("2d");
+      var spinButton = document.getElementById("spin-button");
+      var result = document.getElementById("result");
+      var regionBox = document.getElementById("region-chips");
+      var starBox = document.getElementById("star-chips");
+      var historyBox = document.getElementById("history");
+      var historyList = document.getElementById("history-list");
+
+      var selectedRegions = REGIONS.slice();
+      var selectedStars = STARS.slice();
+      var items = RESTAURANTS.slice();
+      var rotation = 0;    // 目前轉盤角度（弧度，順時針為正）
+      var spinning = false;
+      var history = [];
+      var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function starText(n) { return "米其林 " + "★★★".slice(0, n) + "（" + ["", "一", "二", "三"][n] + "星）"; }
+
+      function lineColor() {
+        return getComputedStyle(document.documentElement).getPropertyValue("--wheel-line").trim() || "#fff";
+      }
+
+      // 畫轉盤：第 0 格從正上方開始，順時針排列。
+      function drawWheel() {
+        var size = canvas.width, c = size / 2, r = c - 6;
+        var arc = TAU / Math.max(items.length, 1);
+        var baseSize = items.length > 20 ? 28 : items.length > 12 ? 32 : items.length > 6 ? 38 : 46;
+        ctx.clearRect(0, 0, size, size);
+        if (!items.length) return;
+        items.forEach(function (item, i) {
+          var start = -Math.PI / 2 + i * arc;
+          ctx.beginPath();
+          ctx.moveTo(c, c);
+          ctx.arc(c, c, r, start, start + arc);
+          ctx.closePath();
+          var color = COLORS[i % COLORS.length];
+          // 最後一格避免與第一格同色
+          if (i === items.length - 1 && i % COLORS.length === 0 && i > 0) color = COLORS[4];
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.lineWidth = items.length > 20 ? 2 : 4;
+          ctx.strokeStyle = lineColor();
+          ctx.stroke();
+
+          ctx.save();
+          ctx.translate(c, c);
+          ctx.rotate(start + arc / 2);
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#ffffff";
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          ctx.shadowBlur = 4;
+          // 名稱太長時自動縮小字級，避免文字壓到中間的圓心
+          var maxWidth = r - 44 - size * 0.1 - 16;
+          var fs = baseSize;
+          do {
+            ctx.font = "700 " + fs + "px system-ui, 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', sans-serif";
+            fs -= 2;
+          } while (ctx.measureText(item.name).width > maxWidth && fs > 16);
+          ctx.fillText(item.name, r - 44, 0);   // 離外圈留空間，避免被上方指針蓋住
+          ctx.restore();
+        });
+      }
+
+      function setRotation(rad) {
+        rotation = rad;
+        canvas.style.transform = "rotate(" + rad + "rad)";
+      }
+
+      // 指針在正上方：轉盤順時針轉了 rotation，指針對到的是第 floor((-rotation mod 2π) / 每格角度) 格。
+      function indexAtPointer() {
+        var arc = TAU / items.length;
+        var a = ((-rotation % TAU) + TAU) % TAU;
+        return Math.floor(a / arc) % items.length;
+      }
+
+      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+      function spin() {
+        if (spinning || items.length < 2) return;
+        spinning = true;
+        spinButton.disabled = true;
+        result.innerHTML = '<p class="label">轉盤轉動中…</p><h2>猜猜看是哪一家？</h2>';
+
+        var arc = TAU / items.length;
+        var target = Math.floor(Math.random() * items.length);
+        var jitter = (Math.random() - 0.5) * arc * 0.7;   // 停在該格內的隨機位置，不壓線
+        var desired = -(target + 0.5) * arc + jitter;
+        var delta = ((desired - rotation) % TAU + TAU) % TAU;
+        var turns = reduceMotion ? 0 : 5 + Math.floor(Math.random() * 3);
+        var from = rotation;
+        var to = rotation + turns * TAU + delta;
+        var duration = reduceMotion ? 400 : 4500;
+        var t0 = null;
+
+        function frame(now) {
+          if (t0 === null) t0 = now;
+          var t = Math.min(1, (now - t0) / duration);
+          setRotation(from + (to - from) * easeOutCubic(t));
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            setRotation(to % TAU);
+            spinning = false;
+            spinButton.disabled = false;
+            showResult(items[indexAtPointer()]);
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function showResult(item) {
+        result.textContent = "";
+        var label = document.createElement("p");
+        label.className = "label";
+        label.textContent = "下一頓就吃";
+        var h2 = document.createElement("h2");
+        h2.textContent = item.name;
+        var stars = document.createElement("p");
+        stars.className = "stars";
+        stars.textContent = starText(item.stars);
+        var where = document.createElement("p");
+        where.className = "where";
+        where.textContent = "地點：" + item.city;
+        var desc = document.createElement("p");
+        desc.className = "desc";
+        desc.textContent = item.desc || "《臺灣米其林指南 2026》" + ["", "一", "二", "三"][item.stars] + "星餐廳。";
+        var map = document.createElement("a");
+        map.className = "map-link";
+        map.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(item.name + " " + item.city + " 餐廳");
+        map.target = "_blank";
+        map.rel = "noopener noreferrer";
+        map.textContent = "在 Google 地圖查看";
+        result.append(label, h2, stars, where, desc, map);
+
+        history.unshift(item.name + "（" + item.city + "・" + ["", "一", "二", "三"][item.stars] + "星）");
+        history = history.slice(0, 5);
+        historyList.textContent = "";
+        history.forEach(function (text) {
+          var li = document.createElement("li");
+          li.textContent = text;
+          historyList.appendChild(li);
+        });
+        historyBox.hidden = false;
+      }
+
+      function applyFilter() {
+        items = RESTAURANTS.filter(function (r) {
+          return selectedRegions.indexOf(r.region) !== -1 && selectedStars.indexOf(r.stars) !== -1;
+        });
+        setRotation(0);
+        drawWheel();
+        spinButton.disabled = items.length < 2;
+        if (items.length < 2) {
+          result.innerHTML = '<p class="label">選項太少</p><h2>符合條件的餐廳不到 2 家，請多選一些地區或星級</h2>';
+        } else if (!spinning) {
+          result.innerHTML = '<p class="label">共 ' + items.length + ' 家餐廳</p><h2>按下「轉一下」</h2>';
+        }
+      }
+
+      function makeChips(box, values, labelOf, countOf, onChange) {
+        values.forEach(function (value) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "chip";
+          btn.textContent = labelOf(value) + "（" + countOf(value) + "）";
+          btn.setAttribute("aria-pressed", "true");
+          btn.dataset.value = String(value);
+          btn.addEventListener("click", function () {
+            if (spinning) return;
+            var on = btn.getAttribute("aria-pressed") === "true";
+            btn.setAttribute("aria-pressed", on ? "false" : "true");
+            onChange();
+          });
+          box.appendChild(btn);
+        });
+      }
+
+      function pressedValues(box) {
+        return Array.prototype.filter.call(box.querySelectorAll(".chip"), function (b) {
+          return b.getAttribute("aria-pressed") === "true";
+        }).map(function (b) { return b.dataset.value; });
+      }
+
+      makeChips(regionBox, REGIONS,
+        function (v) { return v; },
+        function (v) { return RESTAURANTS.filter(function (r) { return r.region === v; }).length; },
+        function () { selectedRegions = pressedValues(regionBox); applyFilter(); });
+      makeChips(starBox, STARS,
+        function (v) { return ["", "一", "二", "三"][v] + "星"; },
+        function (v) { return RESTAURANTS.filter(function (r) { return r.stars === v; }).length; },
+        function () { selectedStars = pressedValues(starBox).map(Number); applyFilter(); });
+
+      spinButton.addEventListener("click", spin);
+      if (window.matchMedia) {
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        if (mq.addEventListener) mq.addEventListener("change", drawWheel);
+      }
+
+      drawWheel();
+    })();
+  </script>
+</body>
+</html>
